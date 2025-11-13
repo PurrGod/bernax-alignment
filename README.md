@@ -1,38 +1,47 @@
 # bernax-alignment
-bme160 project desc
-.
-
-📘 README.md — RNA-Probe Project
 
 Version: 0.1
+
 Audience: Wet-lab biologists, undergraduate researchers, graduate students, rotation students, and PIs with minimal computational background.
 
-🔬 Project Summary
+## Overview
 
-The RNA-Probe Project is a reproducible, Python-based pipeline that mirrors the Galaxy ref-based RNA-seq workflow used in transcriptomics research. It aligns RNA sequencing reads, counts gene expression, performs DESeq2 analysis, and then identifies unknown or unassigned reads using BLAST.
+The RNA-Probe Project is a reproducible, Python-based pipeline that mirrors a reference-based RNA-seq workflow. It performs the following high-level tasks:
 
-This repository provides two high-level scripts:
+- Align RNA sequencing reads
+- Count gene expression
+- Run DESeq2 differential expression analysis
+- Identify unknown or unassigned reads using BLAST
 
-📂 Repository Layout
-rna_probe_project/
+The repository exposes two top-level scripts for common workflows:
+
+- `align.py` — Run the complete RNA-seq → DESeq2 pipeline
+- `probe.py` — BLAST the unassigned reads
+
+## Repository layout
+
+The important files and directories are:
+
+```
+bernax-alignment/
 ├── align.py                 # Run complete RNA-seq → DESeq2 pipeline
 ├── probe.py                 # BLAST the unassigned reads
 ├── README.md
-├── docs/
+├── docs/                    # Usage and pipeline documentation
 │   ├── install_guide.md
 │   ├── usage_align.md
 │   ├── usage_probe.md
 │   └── pipeline_overview.md
-├── config/
+├── config/                  # Example reference and sample config files
 │   ├── reference_mouse.yml
 │   ├── reference_human.yml
 │   └── samples_example.tsv
-├── envs/
+├── envs/                    # Conda environment YAMLs (recommended)
 │   ├── alignment.yml        # STAR, samtools, featureCounts, FastQC, BLAST+
 │   └── r_deseq2.yml         # R + DESeq2 + annotation libraries
-├── r_scripts/
+├── r_scripts/               # R helper scripts for DESeq2
 │   └── run_deseq2.R
-└── rna_pipeline/
+└── rna_pipeline/            # Core Python modules used by the two scripts
     ├── samplesheet.py
     ├── qc.py
     ├── star_runner.py
@@ -43,14 +52,39 @@ rna_probe_project/
     ├── blast_parser.py
     ├── cli_common.py
     └── utils.py
+```
 
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-🧬 Support
+## Documentation
 
-This repository is designed for use inside a research lab. If something breaks:
+Detailed usage and installation instructions are in the `docs/` folder:
 
-Ask a computationally-inclined member of the lab
+- `docs/install_guide.md` — Environment setup and dependencies
+- `docs/usage_align.md` — How to run `align.py`
+- `docs/usage_probe.md` — How to run `probe.py`
+- `docs/pipeline_overview.md` — High-level pipeline description
 
-Open a GitHub issue
+## Quick notes
 
-Send an email/slack to the pipeline maintainer
+- This project is intended to be run in a reproducible environment — using the Conda YAMLs in `envs/` is recommended.
+- The pipeline expects a properly formatted samplesheet and reference YAML (see `config/` for examples).
+- For DESeq2 steps, R and the necessary Bioconductor libraries are required (see `envs/r_deseq2.yml`).
+
+## Support
+
+If you run into problems, try the following:
+
+1. Ask a computationally-inclined member of your lab.
+2. Open a GitHub issue in this repository.
+3. Contact the pipeline maintainer via email or Slack.
+
+## License
+
+This repository includes a `LICENSE` file at the project root. Check it for license details.
+
+## Contributing
+
+Contributions are welcome. Please open an issue first to discuss larger changes.
+
+## Credits
+
+This project was developed as part of the BME160 course materials.
