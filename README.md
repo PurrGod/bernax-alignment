@@ -87,4 +87,4 @@ Contributions are welcome. Please open an issue first to discuss larger changes.
 
 ## Credits
 
-This project was developed as part of the BME160 course materials.
+This project was developed as part of the BME160 course materials at UC Santa Cruz (SHOUTOUT DAVID BERNICK). Code Base developed in cooperation by Evan F, Moe SLL, David J, Akhilesh N.
