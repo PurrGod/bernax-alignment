@@ -1,12 +1,11 @@
-"""
-featurecounts.py
+# featurecounts.py
 
+"""
 Wrapper for featureCounts.
 
 Responsibilities:
 - Run featureCounts on all BAM files.
-- Parse counts.txt and counts.txt.summary.
-- Parse per-read assignment files when -R NAME is used.
+- Parse counts.txt and per-read assignment BAMs (-R BAM).
 """
 
 from dataclasses import dataclass
@@ -65,28 +64,39 @@ def run_featurecounts(
     -------
     FeatureCountsResult
     """
-    
+    utils.ensure_dir(outdir)
+
     counts_file = outdir / "counts.txt"
     summary_file = outdir / "counts.txt.summary"
-    
-    bam_files = [star_outputs.bam_files[sample] for sample in star_outputs.sample_ids]
-    
+
+    # Determine GTF from ref_cfg or args
+    gtf = ref_cfg.get("gtf") or getattr(args, "gtf", None)
+    if gtf is None:
+        raise ValueError(
+            "No GTF file provided. Use --gtf or include 'gtf' in reference-config."
+        )
+
+    # Collect BAM files from STAR
+    bam_files = [o.bam for o in star_outputs.per_sample.values()]
+    if not bam_files:
+        raise ValueError("No BAM files found in StarBatchOutputs.")
+
     cmd = [
         "featureCounts",
         "-T", str(getattr(args, "threads", 4)),
-        "-a", ref_cfg.get("gtf"),
+        "-a", str(gtf),
         "-o", str(counts_file),
         "-R", "BAM",
-        *bam_files,
+        *(str(b) for b in bam_files),
     ]
-    
+
     utils.run_cmd(cmd)
-    
-    per_sample_assignment_files = {
-        sample: outdir / f"{sample}.bam.featureCounts.bam"
-        for sample in star_outputs.sample_ids
-    }
-    
+
+    # featureCounts with -R BAM creates <input>.featureCounts.bam
+    per_sample_assignment_files: Dict[str, Path] = {}
+    for sample_id, star_out in star_outputs.per_sample.items():
+        per_sample_assignment_files[sample_id] = Path(str(star_out.bam) + ".featureCounts.bam")
+
     return FeatureCountsResult(
         counts_file=counts_file,
         summary_file=summary_file,
@@ -107,19 +117,20 @@ def parse_assignments(fc_result: FeatureCountsResult) -> Dict[str, SampleAssignm
     dict
         Mapping from sample ID to SampleAssignments.
     """
-    
-    assignments = {}
-    
+    assignments: Dict[str, SampleAssignments] = {}
+
     for sample_id, bam_path in fc_result.per_sample_assignment_files.items():
-        assigned_ids = set()
-        unassigned_ids = set()
-        category_counts = {cat: 0 for cat in AssignmentCategory}
-        
+        assigned_ids: set[str] = set()
+        unassigned_ids: set[str] = set()
+        category_counts: Dict[AssignmentCategory, int] = {
+            cat: 0 for cat in AssignmentCategory
+        }
+
         with pysam.AlignmentFile(str(bam_path), "rb") as bam:
             for read in bam:
                 read_id = read.query_name
                 tag = read.get_tag("XS") if read.has_tag("XS") else None
-                
+
                 if tag == "Assigned":
                     assigned_ids.add(read_id)
                     category_counts[AssignmentCategory.ASSIGNED] += 1
@@ -133,11 +144,12 @@ def parse_assignments(fc_result: FeatureCountsResult) -> Dict[str, SampleAssignm
                         category_counts[AssignmentCategory.UNASSIGNED_MAPPING_QUALITY] += 1
                     elif tag == "Unassigned_Ambiguous":
                         category_counts[AssignmentCategory.UNASSIGNED_AMBIGUITY] += 1
-        
+
         assignments[sample_id] = SampleAssignments(
             assigned_ids=assigned_ids,
             unassigned_ids=unassigned_ids,
             category_counts=category_counts,
         )
-    
+
     return assignments
+

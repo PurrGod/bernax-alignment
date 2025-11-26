@@ -1,53 +1,36 @@
+# qc.py
+
 """
-qc.py
+QC and trimming wrappers.
 
-Quality control and trimming for FASTQ files.
-
-This module runs:
-- FastQC (before/after trimming)
-- Optional trimming (cutadapt or fastp)
+For now, these are minimal stubs so the pipeline runs without doing real QC.
+You can later replace these with real FastQC / trimming steps.
 """
 
-from typing import List, Any, Dict
+from typing import List, Any
 from pathlib import Path
 
 from .samplesheet import Sample
+from . import utils
 
 
-def run_fastqc(samples: List[Sample], args: Any, ref_cfg: Dict) -> None:
+def run_fastqc(samples: List[Sample], args: Any, ref_cfg: dict) -> None:
     """
-    Run FastQC on input FASTQs.
+    Run FastQC (stub).
 
-    Parameters
-    ----------
-    samples : list of Sample
-        Samples to process.
-    args : argparse.Namespace
-        Command-line arguments.
-    ref_cfg : dict
-        Reference configuration (not heavily used here, but included for symmetry).
+    Currently a no-op; implement real FastQC here later.
     """
-    # TODO: implement FastQC calls (likely using utils.run_cmd)
-    raise NotImplementedError
+    # Example placeholder: create a qc/ directory so users see something.
+    qc_dir = utils.subdir(Path(args.outdir), "qc")
+    # TODO: implement real FastQC if desired.
+    return None
 
 
-def run_trimming(samples: List[Sample], args: Any, ref_cfg: Dict) -> List[Sample]:
+def run_trimming(samples: List[Sample], args: Any, ref_cfg: dict) -> List[Sample]:
     """
-    Run trimming (cutadapt/fastp) and return updated samples.
+    Run read trimming (stub).
 
-    Parameters
-    ----------
-    samples : list of Sample
-        Original samples.
-    args : argparse.Namespace
-        Command-line arguments (e.g. trimming options).
-    ref_cfg : dict
-        Reference configuration.
-
-    Returns
-    -------
-    List[Sample]
-        New Sample objects pointing to trimmed FASTQs.
+    Currently just returns the input samples unchanged.
     """
-    # TODO: implement
-    raise NotImplementedError
+    # TODO: implement trimming with e.g. fastp, trimmomatic, etc.
+    return samples

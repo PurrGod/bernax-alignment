@@ -1,59 +1,35 @@
-"""
-assign_split.py
+# assign_split.py
 
+"""
 Create sequenceA (assigned reads) and sequenceUa (unassigned reads) FASTQ files
 based on featureCounts assignments and STAR outputs.
 """
 
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
-from .star_runner import StarBatchOutputs
+from .star_runner import StarBatchOutputs, StarSampleOutputs
 from .featurecounts import SampleAssignments
 from . import utils
 import gzip
-from typing import Optional, Iterable # Iterable actually isn't used but might be useful later
-
-#
 
 
-def _get_input_fastq_from_sample_outputs(sample_outputs) -> Optional[Path]:
+def _get_input_fastq_from_sample_outputs(sample_outputs: StarSampleOutputs | None) -> Optional[Path]:
     """
-    Try a variety of common attribute/key names to locate the original/unmapped FASTQ
-    for a sample in the STAR outputs object. Return a Path or None.
+    Locate the unmapped FASTQ for a sample from StarSampleOutputs.
+
+    Prefer unmapped_fastq1; fall back to unmapped_fastq2; return None if missing.
     """
-    candidates = [
-        "fastq", "fastq1", "reads", "input_fastq", "input_reads",
-        "unmapped_fastq", "unmapped_out_mate1", "Unmapped.out.mate1",
-        "Unmapped", "unmapped",
-    ]
+    if sample_outputs is None:
+        return None
 
-    # sample_outputs might be a dict-like or an object with attributes
-    for name in candidates:
-        # dict-like access
-        try:
-            if isinstance(sample_outputs, dict) and name in sample_outputs:
-                p = sample_outputs[name]
-                if p:
-                    return Path(p)
-        except Exception:
-            pass
+    # Primary: unmapped mate 1
+    if getattr(sample_outputs, "unmapped_fastq1", None):
+        return Path(sample_outputs.unmapped_fastq1)
 
-        # attribute access
-        try:
-            if hasattr(sample_outputs, name):
-                p = getattr(sample_outputs, name)
-                if p:
-                    return Path(p)
-        except Exception:
-            pass
-
-    # if sample_outputs itself looks like a path
-    try:
-        if isinstance(sample_outputs, (str, Path)):
-            return Path(sample_outputs)
-    except Exception:
-        pass
+    # Fallback: unmapped mate 2
+    if getattr(sample_outputs, "unmapped_fastq2", None):
+        return Path(sample_outputs.unmapped_fastq2)
 
     return None
 
@@ -77,87 +53,17 @@ def _extract_read_id_from_header(header: str) -> str:
     return header.split()[0]
 
 
-def _get_assigned_sets(sample_assignments) -> (Optional[set], Optional[set], Optional[dict]):
+def _get_assigned_sets(sample_assignments: SampleAssignments):
     """
-    Try to extract assigned/unassigned read name sets and an optional counts/categories mapping
-    from the SampleAssignments object. Returns (assigned_set, unassigned_set, counts_dict)
-    where any element may be None if not available.
+    Extract assigned/unassigned read id sets and category counts
+    from the SampleAssignments dataclass.
     """
-    assigned = None
-    unassigned = None
-    counts = None
+    if sample_assignments is None:
+        return None, None, None
 
-    # If sample_assignments is a dict-like structure
-    try:
-        if isinstance(sample_assignments, dict):
-            # common keys
-            if "assigned" in sample_assignments:
-                assigned = set(sample_assignments["assigned"])
-            if "assigned_reads" in sample_assignments:
-                assigned = set(sample_assignments["assigned_reads"])
-            if "unassigned" in sample_assignments:
-                unassigned = set(sample_assignments["unassigned"])
-            if "unassigned_reads" in sample_assignments:
-                unassigned = set(sample_assignments["unassigned_reads"])
-            if "assignments" in sample_assignments and isinstance(sample_assignments["assignments"], dict):
-                # assignments: read -> category
-                mapping = sample_assignments["assignments"]
-                assigned = set(k for k, v in mapping.items() if v and v != "unassigned")
-                unassigned = set(k for k, v in mapping.items() if not v or v == "unassigned")
-            if "counts" in sample_assignments and isinstance(sample_assignments["counts"], dict):
-                counts = dict(sample_assignments["counts"])
-    except Exception:
-        pass
-
-    # Try attribute-based access
-    try:
-        if hasattr(sample_assignments, "assigned"):
-            val = getattr(sample_assignments, "assigned")
-            if val is not None:
-                assigned = set(val)
-    except Exception:
-        pass
-
-    try:
-        if hasattr(sample_assignments, "assigned_reads"):
-            val = getattr(sample_assignments, "assigned_reads")
-            if val is not None:
-                assigned = set(val)
-    except Exception:
-        pass
-
-    try:
-        if hasattr(sample_assignments, "unassigned"):
-            val = getattr(sample_assignments, "unassigned")
-            if val is not None:
-                unassigned = set(val)
-    except Exception:
-        pass
-
-    try:
-        if hasattr(sample_assignments, "unassigned_reads"):
-            val = getattr(sample_assignments, "unassigned_reads")
-            if val is not None:
-                unassigned = set(val)
-    except Exception:
-        pass
-
-    try:
-        if hasattr(sample_assignments, "assignments") and isinstance(getattr(sample_assignments, "assignments"), dict):
-            mapping = getattr(sample_assignments, "assignments")
-            assigned = set(k for k, v in mapping.items() if v and v != "unassigned")
-            unassigned = set(k for k, v in mapping.items() if not v or v == "unassigned")
-    except Exception:
-        pass
-
-    try:
-        if hasattr(sample_assignments, "counts"):
-            val = getattr(sample_assignments, "counts")
-            if isinstance(val, dict):
-                counts = dict(val)
-    except Exception:
-        pass
-
+    assigned = sample_assignments.assigned_ids
+    unassigned = sample_assignments.unassigned_ids
+    counts = sample_assignments.category_counts
     return assigned, unassigned, counts
 
 
@@ -225,47 +131,34 @@ def build_sequence_fastqs(
     """
     utils.ensure_dir(outdir)
 
-    results = {}
     for sample_id, sample_assignments in assignments.items():
         # find corresponding sample outputs in star_outputs
-        sample_outputs = None
-        try:
-            if isinstance(star_outputs, dict) and sample_id in star_outputs:
-                sample_outputs = star_outputs[sample_id]
-            elif hasattr(star_outputs, "outputs") and sample_id in getattr(star_outputs, "outputs"):
-                sample_outputs = getattr(star_outputs, "outputs")[sample_id]
-            elif hasattr(star_outputs, sample_id):
-                sample_outputs = getattr(star_outputs, sample_id)
-            elif hasattr(star_outputs, "get"):
-                sample_outputs = star_outputs.get(sample_id)
-        except Exception:
-            sample_outputs = None
+        sample_outputs = star_outputs.per_sample.get(sample_id, None)
 
         seqA_path = build_sequenceA_for_sample(sample_id, sample_outputs, sample_assignments, outdir)
         seqUa_path = build_sequenceUa_for_sample(sample_id, sample_outputs, sample_assignments, outdir)
 
-        # collect counts if possible
-        assigned_set, unassigned_set, counts = _get_assigned_sets(sample_assignments)
-        stats = {
-            "sequenceA": seqA_path,
-            "sequenceUa": seqUa_path,
-            "assigned_count": len(assigned_set) if assigned_set is not None else None,
-            "unassigned_count": len(unassigned_set) if unassigned_set is not None else None,
-        }
-        if counts:
-            stats["counts"] = counts
-        results[sample_id] = stats
+        # optional logging
+        assigned_set, unassigned_set, _ = _get_assigned_sets(sample_assignments)
+        try:
+            if hasattr(utils, "log"):
+                utils.log(
+                    f"{sample_id}: sequenceA={seqA_path} "
+                    f"(n={len(assigned_set) if assigned_set is not None else 'NA'}), "
+                    f"sequenceUa={seqUa_path} "
+                    f"(n={len(unassigned_set) if unassigned_set is not None else 'NA'})"
+                )
+        except Exception:
+            pass
 
     # write a simple summary TSV
     summary_path = outdir / "assignment_summary.tsv"
     write_assignment_summary(assignments, summary_path)
 
-    return None
-
 
 def build_sequenceA_for_sample(
     sample_id: str,
-    sample_outputs,
+    sample_outputs: StarSampleOutputs | None,
     sample_assignments: SampleAssignments,
     outdir: Path,
 ) -> Path:
@@ -289,7 +182,6 @@ def build_sequenceA_for_sample(
         return outpath
 
     written = _write_filtered_fastq(in_fastq, outpath, assigned_set)
-    # optional: annotate via utils if available
     try:
         if hasattr(utils, "log"):
             utils.log(f"Wrote {written} assigned reads for sample {sample_id} -> {outpath}")
@@ -301,7 +193,7 @@ def build_sequenceA_for_sample(
 
 def build_sequenceUa_for_sample(
     sample_id: str,
-    sample_outputs,
+    sample_outputs: StarSampleOutputs | None,
     sample_assignments: SampleAssignments,
     outdir: Path,
 ) -> Path:
@@ -345,26 +237,26 @@ def write_assignment_summary(
     assignments : dict
     outpath : Path
     """
-    # prepare header columns
-    # try to detect category names from any counts dict present
     all_categories = set()
-    sample_stats = {}
+    sample_stats: Dict[str, Dict[str, int]] = {}
 
     for sample_id, samp in assignments.items():
-        _, _, counts = _get_assigned_sets(samp)
+        assigned_set, unassigned_set, counts = _get_assigned_sets(samp)
+
+        stats: Dict[str, int] = {}
+
+        if assigned_set is not None:
+            stats["Assigned"] = len(assigned_set)
+        if unassigned_set is not None:
+            stats["Unassigned"] = len(unassigned_set)
+
         if counts:
-            sample_stats[sample_id] = dict(counts)
-            all_categories.update(counts.keys())
-        else:
-            # fallback to Assigned/Unassigned counts if available
-            assigned_set, unassigned_set, _ = _get_assigned_sets(samp)
-            stats = {}
-            if assigned_set is not None:
-                stats["Assigned"] = len(assigned_set)
-            if unassigned_set is not None:
-                stats["Unassigned"] = len(unassigned_set)
-            sample_stats[sample_id] = stats
-            all_categories.update(stats.keys())
+            # Use human-readable category names
+            for cat, v in counts.items():
+                stats[cat.name] = v
+
+        sample_stats[sample_id] = stats
+        all_categories.update(stats.keys())
 
     # write TSV
     with open(outpath, "w") as outfh:
@@ -377,3 +269,4 @@ def write_assignment_summary(
                 v = stats.get(c)
                 row.append(str(v) if v is not None else "NA")
             outfh.write("\t".join(row) + "\n")
+

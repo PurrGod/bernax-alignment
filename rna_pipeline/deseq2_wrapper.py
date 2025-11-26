@@ -1,6 +1,6 @@
-"""
-deseq2_wrapper.py
+# deseq2_wrapper.py
 
+"""
 Thin wrapper for running DESeq2 via an R script.
 """
 
@@ -34,5 +34,17 @@ def run_deseq2(
         Reference configuration (for organism-specific settings if needed).
     """
     utils.ensure_dir(outdir)
-    # TODO: build Rscript command and call utils.run_cmd
-    raise NotImplementedError
+
+    # Allow override of script location via reference config
+    script_path = Path(ref_cfg.get("deseq2_script", "r_scripts/run_deseq2.R"))
+
+    cmd = [
+        "Rscript",
+        str(script_path),
+        str(counts_file),
+        str(samplesheet_path),
+        organism,
+        str(outdir),
+    ]
+
+    utils.run_cmd(cmd)

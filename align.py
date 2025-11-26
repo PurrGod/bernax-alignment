@@ -46,7 +46,8 @@ def run_align_pipeline(args: argparse.Namespace) -> None:
     utils.ensure_dir(outdir)
 
     # Load reference configuration (STAR index, GTF, etc.)
-    ref_cfg = utils.load_reference_config(Path(args.reference_config))
+    ref_cfg = utils.load_reference_config(args.reference_config)
+
 
     # Parse and validate samplesheet
     sample_list = samplesheet.parse_samplesheet(Path(args.samples))
