@@ -43,7 +43,7 @@ def filterAndSummarize(
     matchOut = outputFolder / "matchedSequences.tsv"
     summaryOut = outputFolder / "summaryPerSample.tsv"
 
-    # 2. Safety Check: Is the input empty?
+    # 2. Check if input empty
     # If the file doesn't exist or is empty, make empty outputs and stop.
     if not blastTab.exists() or blastTab.stat().st_size == 0:
         print("Warning: {} is empty. Creating empty output files.".format(blastTab))
@@ -75,7 +75,7 @@ def filterAndSummarize(
     # Keep only the rows that match our criteria
     cleanDf = df[goodHitsMask].copy()
 
-    # 5. Deduplicate (Best Hit per Read)
+    # 5. Find best hit per read
     # Sort by Bitscore (Highest first) and E-value (Lowest first)
     cleanDf = cleanDf.sort_values(by=["bitscore", "evalue"], ascending=[False, True])
 
