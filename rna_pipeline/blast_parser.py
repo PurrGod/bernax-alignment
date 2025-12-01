@@ -1,108 +1,137 @@
 """
-blast_parser.py
-
-Main module for parsing BLAST output files and filtering results.
+blast_parser.py 
+This module parses BLAST output files and extracts relevant information.
 """
 
-import pandas as pd
-from pathlib import Path
-from typing import Tuple
+import os
 
-# BLAST standard 6 columns + custom columns we requested (qcovs, stitle)
-BLAST_COLUMNS = [
-    'qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen', 
-    'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore', 
-    'qcovs', 'stitle'
-]
+# Created indices first for the columns for easier access and understanding
 
-def getSampleFromReadId(readId):
-    """
-    Extracts the Sample ID from the Read ID.
-    Assumes the format: 'SampleName_ReadID'
-    """
-    # Split by the first underscore only
-    if "_" in readId:
-        return readId.split("_", 1)[0]
-    return "Unknown"
+IDX_QSEQID = 0
+IDX_SSEQID = 1
+IDX_PIDENT = 2
+IDX_LENGTH = 3
+IDX_MISMATCH = 4
+IDX_GAPOPEN = 5
+IDX_QSTART = 6
+IDX_QEND = 7
+IDX_SSTART = 8
+IDX_SEND = 9
+IDX_EVALUE = 10
+IDX_BITSCORE = 11
+IDX_QCOVS = 12
+IDX_STITLE = 13
 
-def filterAndSummarize(
-    blastTab: Path,
-    minPident: float,
-    minQcov: float,
-    maxEvalue: float,
-    outDir: Path,
-) -> Tuple[Path, Path]:
-    """
-    Filter BLAST hits and write matchedSequences.tsv and summaryPerSample.tsv.
-    """
 
-    # 1. Setup Output Directory
-    outputFolder = Path(outDir)
-    outputFolder.mkdir(parents=True, exist_ok=True)
+def getSampleFromReadID(readID):
+    """Extracts sample ID (everything before the first _)"""
+    if "_" in readID:
+        return readID.split("_", 1)[0]
+    return "Unknown Sample"
 
-    matchOut = outputFolder / "matchedSequences.tsv"
-    summaryOut = outputFolder / "summaryPerSample.tsv"
-
-    # 2. Check if input empty
-    # If the file doesn't exist or is empty, make empty outputs and stop.
-    if not blastTab.exists() or blastTab.stat().st_size == 0:
-        print("Warning: {} is empty. Creating empty output files.".format(blastTab))
-        pd.DataFrame(columns=BLAST_COLS).to_csv(matchOut, sep='\t', index=False)
-        pd.DataFrame(columns=['sampleId', 'stitle', 'count']).to_csv(summaryOut, sep='\t', index=False)
-        return matchOut, summaryOut
+def filterAndSummarize(blastTab, minPident, minQcov, maxEvalue, outDir):
+    # Setup output files 
+    if not os.path.exists(outDir):
+        os.makedirs(outDir)
     
-    # 3. Load Data
-    print("Loading BLAST results from {}...".format(blastTab))
-    try:
-        # We use header=None because BLAST output usually has no header row
-        df = pd.read_csv(blastTab, sep='\t', names=BLAST_COLUMNS, comment='#')
-    except pd.errors.EmptyDataError:
-        # Handle files that exist but have no data rows
-        pd.DataFrame(columns=BLAST_COLS).to_csv(matchOut, sep='\t', index=False)
-        pd.DataFrame(columns=['sampleId', 'stitle', 'count']).to_csv(summaryOut, sep='\t', index=False)
-        return matchOut, summaryOut
-    
-    # 4. Filter the Hits 
-    print("Filtering: Identity >= {}%, Coverage >= {}%, E-value <= {}".format(minPident, minQcov, maxEvalue))
-    
-    # Create a filter mask (True/False for each row)
-    goodHitsMask = (
-        (df['pident'] >= minPident) &
-        (df['qcovs'] >= minQcov) & 
-        (df['evalue'] <= maxEvalue)
-    )
+    matchOut = os.path.join(outDir, "matchedSequences.tsv")
+    summaryOut = os.path.join(outDir, "summaryPerSample.tsv")
 
-    # Keep only the rows that match our criteria
-    cleanDf = df[goodHitsMask].copy()
+    # bestHits dictionary to store qseqid -> (line, bitscore) 
 
-    # 5. Find best hit per read
-    # Sort by Bitscore (Highest first) and E-value (Lowest first)
-    cleanDf = cleanDf.sort_values(by=["bitscore", "evalue"], ascending=[False, True])
+    bestHits = {}
 
-    # Drop duplicates on 'qseqid', keeping the first one (which is the best one)
-    bestHitsDf = cleanDf.drop_duplicates(subset='qseqid', keep='first')
+    print("Reading {}...".format(blastTab))
 
-    # 6. Extract Sample IDs
-    # We use the helper function to pull the sample name from the read ID
-    if not bestHitsDf.empty:
-        bestHitsDf['sampleId'] = bestHitsDf['qseqid'].apply(getSampleFromReadId)
-    else:
-        bestHitsDf['sampleId'] = []
+    # Read the file line-by-line
+    with open(blastTab, 'r') as infile: 
+        for line in infile: 
+            if line.startswith('#') or not line.strip():
+                continue 
 
-    # 7. Save the Detailed Report 
-    print("Saving detailed matches to {}...".format(matchOut))
-    bestHitsDf.to_csv(matchOut, sep='\t', index=False)
+            # Split the line into list of columns
+            columns = line.strip().split('\t')
 
-    # 8. Create and Save Summary
-    # Group by Sample ID and Organism Name (stitle), then count the rows
-    if not bestHitsDf.empty:
-        summaryDf = bestHitsDf.groupby(['sampleId', 'stitle']).size().reset_index(name='count')
-        # Sort so the most abundant organisms are at the top
-        summaryDf = summaryDf.sort_values(by=['sampleId', 'count'], ascending=[True, False])
-    else:
-        summaryDf = pd.DataFrame(columns=['sampleId', 'stitle', 'count'])
+            # Check if line meets enough columns
+            if len(columns) < 14:
+                continue
 
-    print("Saving summary report to {}...".format(summaryOut))
-    summaryDf.to_csv(summaryOut, sep='\t', index=False)
+            # Data extraction 
+            pident = float(columns[IDX_PIDENT])
+            qcovs = float(columns[IDX_QCOVS])
+            evalue = float(columns[IDX_EVALUE])
+            bitscore = float(columns[IDX_BITSCORE])
+            qseqid = columns[IDX_QSEQID]
+
+            # Applying the filters 
+            if pident >= minPident and qcovs >= minQcov and evalue <= maxEvalue:
+                # Checks if current iteration is the best hit for the readID
+                if qseqid not in bestHits:
+                    # First time -> save it 
+                    bestHits[qseqid] = (line.strip(), bitscore)
+                else:
+                    # Compare existing bitscore 
+                    currentBest = bestHits[qseqid][1] 
+                    if bitscore > currentBest:
+                        # Higher score is kept 
+                        bestHits[qseqid] = (line.strip(), bitscore)
+
+    if not bestHits:
+        print("No hits passed the filtering crtiera.")
+
+        # Write empty output tsv file with header
+        with open(matchOut, 'w') as outputFile:
+            header = ['qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen',
+                      'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore',
+                      'qcovs', 'stitle']
+            outputFile.write('\t'.join(header) + '\n')
+            
+        with open(summaryOut, 'w') as outputFile:
+            outputFile.write("sampleID\tstitle\tcount\n")
+
+        return matchOut, summaryOut 
+
+    # Write best hits to the output tsv file
+    print("Saving matched sequences to {}...".format(matchOut))
+    with open(matchOut, 'w') as outputFile: 
+        # Header
+        header = ['qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen', 
+                  'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore', 
+                  'qcovs', 'stitle']
+        outputFile.write('\t'.join(header) + '\n')
+        
+        for hit in bestHits.values():
+            outputFile.write(hit[0] + '\n')
+
+    # Generate Summary Counts per sample using dictionary
+    summaryCounts = {} # Key: (sampleID, stitle), Value: Count in int
+
+    print("Generating summary per sample...")
+    # Loop through best matches again
+    for hit in bestHits.values():
+        lineStr = hit[0]
+        columns = lineStr.split('\t')
+
+        # Get sampleID 
+        sID = getSampleFromReadID(columns[IDX_QSEQID])
+        stitle = columns[IDX_STITLE]
+
+        # Add to summary counts
+        key = (sID, stitle) 
+        if key not in summaryCounts:
+            summaryCounts[key] = 0
+        summaryCounts[key] += 1
+
+    # Writing Summary to output file
+    print("Saving summary to {}...".format(summaryOut))
+    with open(summaryOut, 'w') as outputFile:
+        outputFile.write("sampleID\tstitle\tcount\n")
+
+        # Sort alphabetically by sampleID and descending count
+        # Dictionary converted to list for sorting
+        sortedSummary = sorted(summaryCounts.items(), key=lambda item: (item[0][0], -item[1]))
+
+        for (sampleId, stitle), count in sortedSummary:
+            outputFile.write("{}\t{}\t{}\n".format(sampleId, stitle, count))
 
     return matchOut, summaryOut
