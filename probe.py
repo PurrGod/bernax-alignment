@@ -37,6 +37,7 @@ def run_probe_pipeline(args: argparse.Namespace) -> None:
     fasta_path = blast_runner.build_unassigned_fasta(
         input_pattern=args.input_sequences,
         outdir=outdir,
+        sample_size=args.sample_size
     )
 
     # 2) Run BLAST
@@ -53,7 +54,7 @@ def run_probe_pipeline(args: argparse.Namespace) -> None:
         min_pident=args.min_pident,
         min_qcov=args.min_qcov,
         max_evalue=args.max_evalue,
-        outdir=outdir,
+        out_dir=outdir,
     )
 
 
