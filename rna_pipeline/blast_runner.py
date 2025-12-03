@@ -1,111 +1,86 @@
 """
 blast_runner.py
 
-Build combined FASTA from sequenceUa fastqs and run BLAST+.
+Build combined FASTA from sequenceUa fastqs (Subsampled) and run BLAST+.
 """
 
 from pathlib import Path
-from typing import Any
-
+import gzip
 from . import utils
 
+def _open_maybe_gz(path: Path):
+    """Open text-mode for plain or gzip FASTQ files."""
+    if path.suffix == ".gz":
+        return gzip.open(path, "rt")
+    return open(path, "r")
 
-def build_unassigned_fasta(input_pattern: str, outdir: Path) -> Path:
+def build_unassigned_fasta(input_pattern: str, outdir: Path, sample_size: int = 10000) -> Path:
     """
-    Convert all sequenceUa FASTQs matching a pattern into a single FASTA file.
-
+    Convert sequenceUa FASTQs into a single FASTA file.
+    
     Parameters
     ----------
     input_pattern : str
-        Glob pattern for sequenceUa FASTQs.
+        Glob pattern for input files.
     outdir : Path
-
-    Returns
-    -------
-    Path
-        Path to combined FASTA file.
-     """
-    
+        Output directory.
+    sample_size : int
+        Max number of reads to process (Subsampling).
+    """
     outdir.mkdir(parents=True, exist_ok=True)
-    #^^Checks if the output directory exists,if not creates it, if it does it skips creation and continues.
-
     combined_fasta = outdir / "sequenceUa_combined.fasta"
-    #^^Name of the output combined FASTA file, that will be created in here.
-
     fastq_files = sorted(Path().glob(input_pattern))
-    #^^Find all the fastq files matching the input pattern and sort them., no specific names, just patterns.
+    
+    count = 0
+
+    print(f"Building BLAST input from {len(fastq_files)} files (Subsampling {sample_size} reads)...")
 
     with combined_fasta.open('w') as fasta_out:
-    #^^Opens the output FASTA file for writing.
-
         for fq in fastq_files:
-        #^^Starts a loop and goes thru each fastq file found
-           
-           with fq.open('r') as fastq_in:
-            #^^Opens the current fastq file for reading
-               while True:
-                   header = fastq_in.readline()
-                   if not header:
-                       break  
-                   seq = fastq_in.readline()
-                   plus = fastq_in.readline()
-                   qual = fastq_in.readline()
-                #^^This loop should read 4 lines at a time from the fastq file
-                #^^Unless it is corrupted, it should follow, header, sequence, plus, and quality for each line
-                #^^ Once it reaches the end of the file it break the loop
+            if count >= sample_size: break # Stop if global limit reached
+            
+            try:
+                with _open_maybe_gz(fq) as fastq_in:
+                    while True:
+                        if count >= sample_size: break
+                        
+                        # FASTQ Record = 4 lines
+                        header = fastq_in.readline()
+                        if not header: break # End of file
+                        seq = fastq_in.readline()
+                        fastq_in.readline() # Plus line
+                        fastq_in.readline() # Quality line
+                        
+                        # Convert to FASTA (Header + Sequence)
+                        # Ensure header starts with '>'
+                        header_clean = header.strip()
+                        if header_clean.startswith("@"):
+                            header_clean = ">" + header_clean[1:]
+                        else:
+                            header_clean = ">" + header_clean
+                            
+                        sample_name = fq.name.split('.')[0]
+                        fasta_out.write(f">{sample_name}_{header_clean[1:]}\n{seq.strip()}\n")
+                        
+                        count += 1
+            except Exception as e:
+                print(f"Warning: Could not read {fq}: {e}")
 
-                   header = header.strip()
-                   seq = seq.strip()
-                    #^^ Since we only need the header and sequence for FASTA, we strip them
-                    
-                   if header.startswith('@'):
-                       fasta_header = '>' + header[1:]
-                    #^^ Should change the fastq header into the fasta format
-                   else:
-                       fasta_header = '>' + header
-                    #^^ If for some reason it doesn't start with @, this adds the > anyway
-                    
-                   fasta_out.write(f"{fasta_header}\n{seq}\n")
-                   #^^ Writes the fasta with only the header and sequence into the output file
-    
+    print(f"Created {combined_fasta} with {count} sequences.")
     return combined_fasta
-    #^^ Finally, returns the path to combined FASTA file
 
-
-def run_blast(
-    fasta_path: Path,
-    db: str,
-    threads: int,
-    outdir: Path,
-) -> Path:
+def run_blast(fasta_path: Path, db: str, threads: int, outdir: Path) -> Path:
     """
     Run BLAST+ on the combined unassigned FASTA.
-
-    Parameters
-    ----------
-    fasta_path : Path
-    db : str
-        BLAST database path or prefix.
-    threads : int
-    outdir : Path
-
-    Returns
-    -------
-    Path
-        Path to raw BLAST tabular output file.
     """
-    
     outdir.mkdir(parents=True, exist_ok=True)
-    #^^ Same as before, makes sure the output directory exists
-    
     blast_out = outdir / f"{fasta_path.stem}.blast.tsv"
-    #^^ Name the blast output file according to the input fasta file name
-
-    outfmt = ("6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs stitle")
-    #^^ Blast output format, with the columns described in blast_parser.py
+    
+    # Custom output format matching blast_parser expectations
+    outfmt = "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs stitle"
 
     cmd = [
-        "blastn",                       
+        "blastn",
         "-query", str(fasta_path),
         "-db", db,
         "-out", str(blast_out),
@@ -113,11 +88,6 @@ def run_blast(
         "-num_threads", str(threads),
         "-outfmt", outfmt
     ]
-    #^^ This is the list of command line arguments that can be used to run blast in the terminal
     
     utils.run_cmd(cmd)
-    #^^ This is the thing that actually runs the command
-
     return blast_out
-    #^^ Finally returns the path to the blast output file
-    
