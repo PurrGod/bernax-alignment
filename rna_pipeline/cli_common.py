@@ -20,6 +20,7 @@ def build_align_argparser() -> argparse.ArgumentParser:
         description="Run RNA-seq alignment + quantification + DESeq2 pipeline."
     )
     p.add_argument("--samples", required=True, help="Path to samplesheet TSV.")
+    p.add_argument("--sample-size", type=int, default=10000, help="Number of reads to subsample for BLAST.")
     p.add_argument("--genome-index", required=True, help="STAR genome index directory.")
     p.add_argument("--gtf", required=True, help="Gene annotation GTF file.")
     p.add_argument("--outdir", required=True, help="Output directory.")
@@ -56,4 +57,5 @@ def build_probe_argparser() -> argparse.ArgumentParser:
     p.add_argument("--min-pident", type=float, default=90.0, help="Minimum percent identity.")
     p.add_argument("--min-qcov", type=float, default=0.7, help="Minimum query coverage (fraction).")
     p.add_argument("--max-evalue", type=float, default=1e-5, help="Maximum E-value.")
+    p.add_argument("--sample-size", type=int, default=10000, help="Number of reads to subsample for BLAST.")
     return p
