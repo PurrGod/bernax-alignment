@@ -95,7 +95,9 @@ def run_featurecounts(
     # featureCounts with -R BAM creates <input>.featureCounts.bam
     per_sample_assignment_files: Dict[str, Path] = {}
     for sample_id, star_out in star_outputs.per_sample.items():
-        per_sample_assignment_files[sample_id] = Path(str(star_out.bam) + ".featureCounts.bam")
+        output_bam_name = star_out.bam.name + ".featureCounts.bam"
+        per_sample_assignment_files[sample_id] = outdir / output_bam_name
+
 
     return FeatureCountsResult(
         counts_file=counts_file,
@@ -125,6 +127,9 @@ def parse_assignments(fc_result: FeatureCountsResult) -> Dict[str, SampleAssignm
         category_counts: Dict[AssignmentCategory, int] = {
             cat: 0 for cat in AssignmentCategory
         }
+
+        if not bam_path.exists():
+            raise FileNotFoundError(f"Expected featureCounts output BAM not found at {bam_path}.")
 
         with pysam.AlignmentFile(str(bam_path), "rb") as bam:
             for read in bam:
