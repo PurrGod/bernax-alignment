@@ -31,6 +31,7 @@ def build_unassigned_fasta(input_pattern: str, outdir: Path, sample_size: int = 
     combined_fasta = outdir / "sequenceUa_combined.fasta"
     fastq_files = sorted(Path().glob(input_pattern))
     
+    
     count = 0
 
     print(f"Building BLAST input from {len(fastq_files)} files (Subsampling {sample_size} reads)...")
@@ -61,13 +62,17 @@ def build_unassigned_fasta(input_pattern: str, outdir: Path, sample_size: int = 
                             
                         sample_name = fq.name.split('.')[0]
                         fasta_out.write(f">{sample_name}_{header_clean[1:]}\n{seq.strip()}\n")
+                        #Use the FASTQ file name as the sample prefix so that the files are more easily traced
+                        #Format according to how normal FASTA files are formatted
                         
                         count += 1
             except Exception as e:
                 print(f"Warning: Could not read {fq}: {e}")
+                #This ensures that a bad file does not disrupt the entire BLAST preparation step, sends out a warning
 
     print(f"Created {combined_fasta} with {count} sequences.")
     return combined_fasta
+
 
 def run_blast(fasta_path: Path, db: str, threads: int, outdir: Path) -> Path:
     """
@@ -88,6 +93,7 @@ def run_blast(fasta_path: Path, db: str, threads: int, outdir: Path) -> Path:
         "-num_threads", str(threads),
         "-outfmt", outfmt
     ]
-    
+    #Delegate to the shared command runner so logging or error handling is consistent across the pipeline
     utils.run_cmd(cmd)
     return blast_out
+    

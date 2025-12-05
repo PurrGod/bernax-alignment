@@ -22,7 +22,7 @@ IDX_QCOVS = 12
 IDX_STITLE = 13
 
 def get_sample_from_read_id(read_id):
-    """Extracts sample ID (everything before the first _)"""
+    #Extracts sample ID (everything before the first _)
     if "_" in read_id:
         return read_id.split("_", 1)[0]
     return "Unknown Sample"
@@ -89,6 +89,7 @@ def filter_and_summarize(blast_tab, min_pident, min_qcov, max_evalue, out_dir):
         columns = line_str.split('\t')
         s_id = get_sample_from_read_id(columns[IDX_QSEQID])
         stitle = columns[IDX_STITLE]
+        #sampleID is recovered from the qseqid header
 
         key = (s_id, stitle) 
         if key not in summary_counts:
@@ -101,5 +102,6 @@ def filter_and_summarize(blast_tab, min_pident, min_qcov, max_evalue, out_dir):
         sorted_summary = sorted(summary_counts.items(), key=lambda item: (item[0][0], -item[1]))
         for (sample_id, stitle), count in sorted_summary:
             f.write(f"{sample_id}\t{stitle}\t{count}\n")
+        # Sort: first by sample ID (alphabetical), then by descending count
 
     return match_out, summary_out
