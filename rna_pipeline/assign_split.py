@@ -14,12 +14,15 @@ from . import utils
 import gzip
 
 
+######## BERNIFY THE FUNCTION NAMES!############
 def _get_input_fastq_from_sample_outputs(sample_outputs: StarSampleOutputs | None) -> Optional[Path]:
+    
     """
     Locate the unmapped FASTQ for a sample from StarSampleOutputs.
 
     Prefer unmapped_fastq1; fall back to unmapped_fastq2; return None if missing.
     """
+    
     if sample_outputs is None:
         return None
 

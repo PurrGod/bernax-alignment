@@ -33,7 +33,7 @@ def run_deseq2(
     ref_cfg : dict
         Reference configuration (for organism-specific settings if needed).
     """
-    utils.ensure_dir(outdir)
+    utils.ensureDir(outdir)
 
     # Allow override of script location via reference config
     script_path = Path(ref_cfg.get("deseq2_script", "r_scripts/run_deseq2.R"))
@@ -47,4 +47,4 @@ def run_deseq2(
         str(outdir),
     ]
 
-    utils.run_cmd(cmd)
+    utils.runCmd(cmd)

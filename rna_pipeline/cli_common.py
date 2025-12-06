@@ -1,28 +1,27 @@
-"""
+# cli_common.py
+# Group Members: Moe Sithu Maung Maung Lay, Akhilesh Nidamanuri, David Jiricek, Evan Fitzhugh
+
+'''
 cli_common.py
 
-Shared command-line argument parsers and helpers for align.py and probe.py.
-"""
+Purpose: Shared command-line argument parsers and helpers for align.py and probe.py.
+'''
 
 import argparse
 
-
-def build_align_argparser() -> argparse.ArgumentParser:
-    """
+def buildAlignArgparser ():
+    '''
     Build an ArgumentParser for align.py.
-
-    Returns
-    -------
-    argparse.ArgumentParser
-        Configured parser for the alignment pipeline.
-    """
+    Inputs: None
+    Outputs: argparse.ArgumentParser object
+    '''
     p = argparse.ArgumentParser(
         description="Run RNA-seq alignment + quantification + DESeq2 pipeline."
     )
     p.add_argument("--samples", required=True, help="Path to samplesheet TSV.")
     p.add_argument("--sample-size", type=int, default=10000, help="Number of reads to subsample for BLAST.")
-    p.add_argument("--genome-index", required=True, help="STAR genome index directory.")
-    p.add_argument("--gtf", required=True, help="Gene annotation GTF file.")
+    p.add_argument("--genome-index", required=False, help="STAR genome index directory.")
+    p.add_argument("--gtf", required=False, help="Gene annotation GTF file.")
     p.add_argument("--outdir", required=True, help="Output directory.")
     p.add_argument("--organism", required=True, help="Organism key (e.g. mus_musculus).")
     p.add_argument("--reference-config", required=False, default=None,
@@ -33,16 +32,12 @@ def build_align_argparser() -> argparse.ArgumentParser:
     p.add_argument("--run-deseq2", action="store_true", help="Run DESeq2 analysis.")
     return p
 
-
-def build_probe_argparser() -> argparse.ArgumentParser:
-    """
+def buildProbeArgparser ():
+    '''
     Build an ArgumentParser for probe.py.
-
-    Returns
-    -------
-    argparse.ArgumentParser
-        Configured parser for the BLAST pipeline.
-    """
+    Inputs: None
+    Outputs: argparse.ArgumentParser object
+    '''
     p = argparse.ArgumentParser(
         description="Run BLAST on unassigned reads (sequenceUa)."
     )

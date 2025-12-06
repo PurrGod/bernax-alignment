@@ -1,6 +1,6 @@
 # bernax-alignment
 
-Version: 0.1
+Version: 0.2
 
 Audience: Wet-lab biologists, undergraduate researchers, graduate students, rotation students, and PIs with minimal computational background.
 

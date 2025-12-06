@@ -18,12 +18,12 @@ from . import utils
 RefConfig = Dict[str, Any]
 
 #Sets up a logger, so log messages go into the same place as the rest of the pipeline
-logger = utils.get_logger(__name__)
+logger = utils.getLogger(__name__)
 
 
-def run_fastqc(samples: List[Sample], args: Namespace, ref_cfg: RefConfig) -> None:
+def runFastqc(samples: List[Sample], args: Namespace, ref_cfg: RefConfig) -> None:
     """
-    Function: run_fastqc
+    Function: runFastqc
     Purpose: Runs FastQC on all samples
     - Right now it just sets up the folder, but it will run quality check on all the
         fastq1 and fastq2 data. Eventually this would output per-sample QC reports into
@@ -32,7 +32,7 @@ def run_fastqc(samples: List[Sample], args: Namespace, ref_cfg: RefConfig) -> No
 
     #Takes the main output directory and makes sure "qc" subdirectory exists inside
     #The path will go towards that directory
-    qc_dir = utils.subdir(Path(args.outdir), "qc")
+    qc_dir = utils.subDir(Path(args.outdir), "qc")
     
     #Creates information messages about QC
     logger.info("QC stub: created/verified QC directory at %s", qc_dir)
@@ -43,13 +43,13 @@ def run_fastqc(samples: List[Sample], args: Namespace, ref_cfg: RefConfig) -> No
     return None
 
 
-def run_trimming(    
+def runTrimming(    
     samples: List[Sample],
     args: Namespace,
     ref_cfg: RefConfig,
 ) -> List[Sample]:
     """
-    Function: run_trimming
+    Function: runTrimming
     Purpose: A trimming tool for all the samples
     - Right now it returns the original samples unchanged
     """

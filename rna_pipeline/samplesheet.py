@@ -1,38 +1,41 @@
-"""
+# samplesheet.py
+# Group Members: Moe Sithu Maung Maung Lay, Akhilesh Nidamanuri, David Jiricek, Evan Fitzhugh
+
+'''
 samplesheet.py
 
 Purpose: Parse and validate the sample sheet TSV that is provided by the user
 Output: A structured Python object that contains the sample ID, FASTQ paths, and metadata columns
 -This is important because it tells other modules which samples to run.
-"""
+'''
 
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 import csv
 
-
 @dataclass
-class Sample:
-    """
+class Sample :
+    '''
     Represents one entry from the samplesheet, a single RNA-seq.
     It stores attributes for the Sample ID, condition, and paths to its fastq files. 
     Keeps things bundled in a small object.
-    """
+    '''
     id: str
     condition: str
     fastq1: Path
     fastq2: Optional[Path] = None
     # These are the specific attributes (ID, condition, paths)
 
-
-def parse_samplesheet(path: Path) -> List[Sample]:
-    """
-    Function: parse_samplesheet
+def parseSamplesheet (path: Path) -> List[Sample]:
+    '''
+    Function: parseSamplesheet
     Purpose: Reads the samplesheet TSV and converts each row into a Sample object.
     - To do this, it validates required columns, handles header capitalization, cleans
       and verifies FASTQ paths and interprets the paths
-    """
+    Inputs: path (Path)
+    Outputs: List of Sample objects
+    '''
     
     #Creates an empty list where samples will be put into
     samples: List[Sample] = []
@@ -51,11 +54,11 @@ def parse_samplesheet(path: Path) -> List[Sample]:
 
         #Allow case-insensitive header names by mapping lowercase -> actual name
         #This standardizes the process and makes it more forgiving
-        header_map = {h.strip().lower(): h for h in reader.fieldnames}
+        headerMap = {h.strip().lower(): h for h in reader.fieldnames}
 
         #Enforces the 3 key pieces of information without which the pipeline will not run properly
         for req in ("sample_id", "condition", "fastq1"):
-            if req not in header_map:
+            if req not in headerMap:
                 raise ValueError(f"Missing required column '{req}' in samplesheet")
 
         #This loop will make each line of the TSV into a Sample object
@@ -66,21 +69,21 @@ def parse_samplesheet(path: Path) -> List[Sample]:
                 continue
             
             #Unpacks values with the header map created earlier, makes the strings cleaner
-            sid = (row[header_map["sample_id"]] or "").strip()
-            cond = (row[header_map["condition"]] or "").strip()
-            fq1_s = (row[header_map["fastq1"]] or "").strip()
+            sid = (row[headerMap["sample_id"]] or "").strip()
+            cond = (row[headerMap["condition"]] or "").strip()
+            fq1Str = (row[headerMap["fastq1"]] or "").strip()
 
             #This just checks for presence of the values, and raises an error if they are missing
             if not sid:
                 raise ValueError("Found a row with empty sample_id")
             if not cond:
                 raise ValueError(f"Missing condition for sample '{sid}'")
-            if not fq1_s:
+            if not fq1Str:
                 raise ValueError(f"Missing fastq1 for sample '{sid}'")
 
             #Helper that interprets the FastQ paths
-            def _to_path(pstr: str) -> Path:
-                p = Path(pstr)
+            def _toPath (pStr: str) -> Path:
+                p = Path(pStr)
                 
                 # interpret relative paths relative to the samplesheet location
                 if not p.is_absolute():
@@ -89,39 +92,40 @@ def parse_samplesheet(path: Path) -> List[Sample]:
             
             #Used for converting FastQ1 and the optional FastQ2
             #If FastQ2 is present it treats it as a paired-end
-            fq1 = _to_path(fq1_s)
+            fq1 = _toPath(fq1Str)
             fq2 = None
-            if "fastq2" in header_map:
-                fq2_s = (row[header_map["fastq2"]] or "").strip()
-                if fq2_s:
-                    fq2 = _to_path(fq2_s)
+            if "fastq2" in headerMap:
+                fq2Str = (row[headerMap["fastq2"]] or "").strip()
+                if fq2Str:
+                    fq2 = _toPath(fq2Str)
 
             #This just collects the cleaned input, that will be returned by the function
             samples.append(Sample(id=sid, condition=cond, fastq1=fq1, fastq2=fq2))
     
     return samples
 
-
-def validate_samples(samples: List[Sample]) -> None:
-    """
-    Function: validate_samples 
+def validateSamples (samples: List[Sample]) -> None:
+    '''
+    Function: validateSamples 
     Purpose: Validates the data after parsing, check all Sample IDs are unique, and that FastQ files actually exists on the disk
     - This function basically just checks if the actual data makes sense, and raises one collected
         error if something is off.
-    """
+    Inputs: samples (List[Sample])
+    Outputs: None (Raises ValueError on failure)
+    '''
     
     #Creates a list that will collect all posiblle errors, and tracks IDs it already saw
     errors: List[str] = []
-    seen_ids = set()
+    seenIds = set()
 
     #Loops through the objects created earlier
     for s in samples:
        
         #This checks unique IDs, a samplesheet shouldn't contain same sample twice
-        if s.id in seen_ids:
+        if s.id in seenIds:
             errors.append(f"Duplicate sample_id '{s.id}'")
         else:
-            seen_ids.add(s.id)
+            seenIds.add(s.id)
 
         #This checks that the actual FastQ1 file exists
         if not s.fastq1.exists():

@@ -1,6 +1,8 @@
-#!/usr/bin/env python
+# probe.py
+# Group Members: Moe Sithu Maung Maung Lay, Akhilesh Nidamanuri, David Jiricek, Evan Fitzhugh
 
-"""
+
+'''
 probe.py
 
 User-facing entrypoint for BLASTing unassigned reads (sequenceUa).
@@ -12,57 +14,57 @@ This script:
   - Run BLAST+ against a specified database.
   - Filter and summarize BLAST hits.
   - Write matched_sequences.tsv and summary tables.
-"""
+'''
+
 
 from pathlib import Path
 import argparse
 
 from rna_pipeline import blast_runner, blast_parser, utils
-from rna_pipeline.cli_common import build_probe_argparser
+from rna_pipeline.cli_common import buildProbeArgparser
 
 
-def run_probe_pipeline(args: argparse.Namespace) -> None:
-    """
+def runProbePipeline (args):
+    '''
     Orchestrate the BLAST pipeline on unassigned reads.
-
-    Parameters
-    ----------
-    args : argparse.Namespace
-        Parsed command-line arguments from build_probe_argparser().
-    """
-    outdir = Path(args.outdir)
-    utils.ensure_dir(outdir)
+    Inputs: args (Namespace)
+    Outputs: None
+    '''
+    outDir = Path(args.outdir)
+    utils.ensureDir(outDir)
 
     # 1) Build combined FASTA from sequenceUa FASTQs
-    fasta_path = blast_runner.build_unassigned_fasta(
-        input_pattern=args.input_sequences,
-        outdir=outdir,
-        sample_size=args.sample_size
+    fastaPath = blast_runner.buildUnassignedFasta(
+        inputPattern=args.input_sequences,
+        outDir=outDir,
+        sampleSize=args.sample_size
     )
 
     # 2) Run BLAST
-    blast_tab = blast_runner.run_blast(
-        fasta_path=fasta_path,
+    blastTab = blast_runner.runBlast(
+        fastaPath=fastaPath,
         db=args.blast_db,
         threads=args.threads,
-        outdir=outdir,
+        outDir=outDir,
     )
 
     # 3) Parse, filter, and summarize hits
-    blast_parser.filter_and_summarize(
-        blast_tab=blast_tab,
-        min_pident=args.min_pident,
-        min_qcov=args.min_qcov,
-        max_evalue=args.max_evalue,
-        out_dir=outdir,
+    blast_parser.filterAndSummarize(
+        blastTab=blastTab,
+        minPident=args.min_pident,
+        minQcov=args.min_qcov,
+        maxEvalue=args.max_evalue,
+        outDir=outDir,
     )
 
 
-def main() -> None:
-    parser = build_probe_argparser()
+def main ():
+    '''
+    Entry point for the script.
+    '''
+    parser = buildProbeArgparser()
     args = parser.parse_args()
-    run_probe_pipeline(args)
-
+    runProbePipeline(args)
 
 if __name__ == "__main__":
     main()

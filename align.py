@@ -1,104 +1,89 @@
-#!/usr/bin/env python
+# align.py
+# Group Members: Moe Sithu Maung Maung Lay, Akhilesh Nidamanuri, David Jiricek, Evan Fitzhugh
 
-"""
+'''
 align.py
 
-User-facing entrypoint for the RNA alignment + quantification + DESeq2 pipeline.
+User-facing entrypoint for the RNA alignment + quantification pipeline.
 
 This script:
 - Parses command-line arguments.
-- Calls run_align_pipeline() to:
+- Calls runAlignPipeline() to:
   - Load sample sheet and reference config.
-  - Run QC and trimming (optional).
   - Run STAR alignments.
   - Run featureCounts.
-  - Split reads into sequenceA (assigned) and sequenceUa (unassigned).
-  - Optionally run DESeq2 via R.
 
 Intended audience: lab members with basic terminal familiarity.
-"""
+'''
 
 from pathlib import Path
 import argparse
 
 from rna_pipeline import (
     samplesheet,
-    qc,
+    qc, # optional
     star_runner,
     featurecounts,
-    assign_split,
     deseq2_wrapper,
     utils,
 )
-from rna_pipeline.cli_common import build_align_argparser
+from rna_pipeline.cli_common import buildAlignArgparser
 
 
-def run_align_pipeline(args: argparse.Namespace) -> None:
-    """
+def runAlignPipeline (args):
+    '''
     Main orchestrator for the alignment pipeline.
-
-    Parameters
-    ----------
-    args : argparse.Namespace
-        Parsed command-line arguments from build_align_argparser().
-    """
-    outdir = Path(args.outdir)
-    utils.ensure_dir(outdir)
+    Inputs: args (Namespace)
+    Outputs: None
+    '''
+    outDir = Path(args.outdir)
+    utils.ensureDir(outDir)
 
     # Load reference configuration (STAR index, GTF, etc.)
-    config_path = Path(args.reference_config) if args.reference_config else None
-    ref_cfg = utils.load_reference_config(config_path)
-
+    configPath = Path(args.reference_config) if args.reference_config else None
+    refCfg = utils.loadReferenceConfig(configPath)
 
     # Parse and validate samplesheet
-    sample_list = samplesheet.parse_samplesheet(Path(args.samples))
-    samplesheet.validate_samples(sample_list)
+    sampleList = samplesheet.parseSamplesheet(Path(args.samples))
+    samplesheet.validateSamples(sampleList)
 
-    # QC and trimming
+    # QC and trimming -> optional
     if not args.skip_qc:
-        qc.run_fastqc(sample_list, args, ref_cfg)
+        qc.runFastqc(sampleList, args, refCfg)
     if args.trim:
-        sample_list = qc.run_trimming(sample_list, args, ref_cfg)
+        sampleList = qc.runTrimming(sampleList, args, refCfg)
 
     # STAR alignment
-    star_outputs = star_runner.run_star_batch(sample_list, args, ref_cfg)
+    starOutputs = star_runner.runStarBatch(sampleList, args, refCfg)
 
     # featureCounts quantification
-    fc_result = featurecounts.run_featurecounts(
-        star_outputs=star_outputs,
+    fcResult = featurecounts.runFeatureCounts(
+        starOutputs=starOutputs,
         args=args,
-        ref_cfg=ref_cfg,
-        outdir=outdir / "featureCounts",
+        refCfg=refCfg,
+        outDir=outDir / "featureCounts",
     )
 
-    assignments = featurecounts.parse_assignments(fc_result)
-
-    # Split into assigned and unassigned read sets
-    assign_split.build_sequence_fastqs(
-        star_outputs=star_outputs,
-        assignments=assignments,
-        outdir=outdir / "assign_split",
-        args=args,
-        ref_cfg=ref_cfg,
-    )
+    # Parsing assignments (Useful for debugging, but splitting handled by STAR)
+    assignments = featurecounts.parseAssignments(fcResult)
 
     # Optional DESeq2
     if args.run_deseq2:
         deseq2_wrapper.run_deseq2(
-            counts_file=fc_result.counts_file,
+            counts_file=fcResult.countsFile,
             samplesheet_path=Path(args.samples),
             organism=args.organism,
-            outdir=outdir / "deseq2",
-            ref_cfg=ref_cfg,
+            outdir=outDir / "deseq2",
+            ref_cfg=refCfg,
         )
 
-
-def main() -> None:
-    parser = build_align_argparser()
+def main ():
+    '''
+    Entry point for the script.
+    '''
+    parser = buildAlignArgparser()
     args = parser.parse_args()
-    run_align_pipeline(args)
-
+    runAlignPipeline(args)
 
 if __name__ == "__main__":
     main()
-
