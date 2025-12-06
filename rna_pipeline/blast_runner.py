@@ -1,9 +1,10 @@
 """
 blast_runner.py
 
-Build combined FASTA from sequenceUa fastqs (Subsampled) and run BLAST+.
+Purpose: Build combined FASTA from sequenceUA FastQs and run BLASTN/BLAST+ on them.
 """
 
+#Imports needed files and tools
 from pathlib import Path
 import gzip
 from . import utils
@@ -16,17 +17,12 @@ def _open_maybe_gz(path: Path):
 
 def build_unassigned_fasta(input_pattern: str, outdir: Path, sample_size: int = 10000) -> Path:
     """
-    Convert sequenceUa FASTQs into a single FASTA file.
-    
-    Parameters
-    ----------
-    input_pattern : str
-        Glob pattern for input files.
-    outdir : Path
-        Output directory.
-    sample_size : int
-        Max number of reads to process (Subsampling).
+    Function: build_unassigned_fasta
+    Purpose: Converts sequenceUa FASTQs into a single FASTA file.
+    -We need to convert into FASTA in order to be able to run BLAST+ on them
     """
+    
+    #Checks that the output directory exists, if not it creates one
     outdir.mkdir(parents=True, exist_ok=True)
     combined_fasta = outdir / "sequenceUa_combined.fasta"
     fastq_files = sorted(Path().glob(input_pattern))
@@ -59,17 +55,19 @@ def build_unassigned_fasta(input_pattern: str, outdir: Path, sample_size: int = 
                             header_clean = ">" + header_clean[1:]
                         else:
                             header_clean = ">" + header_clean
-                            
+                       
+                        #Use the FASTQ file name as the sample prefix so that the files are more easily traced
+                        #Format according to how normal FASTA files are formatted    
                         sample_name = fq.name.split('.')[0]
                         fasta_out.write(f">{sample_name}_{header_clean[1:]}\n{seq.strip()}\n")
-                        #Use the FASTQ file name as the sample prefix so that the files are more easily traced
-                        #Format according to how normal FASTA files are formatted
-                        
+                         
                         count += 1
+            
+            #This ensures that a bad file does not disrupt the entire BLAST preparation step, sends out a warning
             except Exception as e:
                 print(f"Warning: Could not read {fq}: {e}")
-                #This ensures that a bad file does not disrupt the entire BLAST preparation step, sends out a warning
 
+    #Prints a message with information about the created FASTA file.            
     print(f"Created {combined_fasta} with {count} sequences.")
     return combined_fasta
 
