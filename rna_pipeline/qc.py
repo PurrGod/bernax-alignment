@@ -2,8 +2,8 @@
 qc.py
 
 Purpose: This file is used for quality control (FastQC) and trimming for the pipeline
-Output: Creates a directory for QC and gives files with QC information as well as the trimmed samples
-        however it is not implemented yet, so it is just a placeholder for now.
+Output: Creates a directory for QC and logs messages, however it is not implemented yet, 
+        so it is just a placeholder for now.
 """
 
 #Imports all the useful tools for QC and trimming as well as the Samples from the samplesheet, created earlier
@@ -25,8 +25,9 @@ def run_fastqc(samples: List[Sample], args: Namespace, ref_cfg: RefConfig) -> No
     """
     Function: run_fastqc
     Purpose: Runs FastQC on all samples
-    - Right now it just sets up the folder, but it will run quality check on all the fastq1 and fastq2 data
-      Which would eventually output the quality per sample reads, right now just a placeholder that returns the samples
+    - Right now it just sets up the folder, but it will run quality check on all the
+        fastq1 and fastq2 data. Eventually this would output per-sample QC reports into
+        the qc/ directory. For now it is only a placeholder and does not run FastQC yet.
     """
 
     #Takes the main output directory and makes sure "qc" subdirectory exists inside
