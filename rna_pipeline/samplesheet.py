@@ -104,8 +104,8 @@ def parse_samplesheet(path: Path) -> List[Sample]:
 
 def validate_samples(samples: List[Sample]) -> None:
     """
-    Function: Validates the data after parsing 
-    Purpose: Check all Sample IDs are unique, and that FastQ files actually exists on the disk
+    Function: validate_samples 
+    Purpose: Validates the data after parsing, check all Sample IDs are unique, and that FastQ files actually exists on the disk
     - This function basically just checks if the actual data makes sense, and raises one collected
         error if something is off.
     """
