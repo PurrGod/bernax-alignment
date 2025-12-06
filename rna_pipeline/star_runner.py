@@ -1,20 +1,18 @@
-# star_runner.py
-
 """
-Wrapper around the STAR aligner.
+star_runner.py
 
-Responsibilities:
-- Build and run STAR commands for each sample.
-- Collect paths to BAM and unmapped FASTQs.
+Purpose: STAR aligner wrapper, that builds and runs STAR commands for each sample. 
+        It collects paths to BAM and unmapped FastQs. For each sample the module outputs the aligned BAM file 
+        and the unmapped reads, and wraps them in a clean Python object. When running multiple samples, 
+        it returns a dictionary mapping each sample to its output files.
 """
 
+#Imports useful tools as well as mainly the samples from the samplesheet
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Any
-
 from .samplesheet import Sample
 from . import utils
-
 
 @dataclass
 class StarSampleOutputs:
@@ -22,7 +20,6 @@ class StarSampleOutputs:
     bam: Path
     unmapped_fastq1: Path
     unmapped_fastq2: Path | None = None
-
 
 @dataclass
 class StarBatchOutputs:
@@ -33,7 +30,6 @@ class StarBatchOutputs:
     def bam_files(self) -> List[Path]:
         """Return a list of all BAM files."""
         return [o.bam for o in self.per_sample.values()]
-
 
 def _resolve_genome_index(args: Any, ref_cfg: dict) -> Path:
     """
@@ -51,28 +47,14 @@ def _resolve_genome_index(args: Any, ref_cfg: dict) -> Path:
         )
     return Path(genome_dir)
 
-
 def run_star(sample: Sample, args: Any, ref_cfg: dict, outdir: Path) -> StarSampleOutputs:
     """
-    Run STAR for a single sample.
-
-    Parameters
-    ----------
-    sample : Sample
-        Sample to align.
-    args : argparse.Namespace
-        Command-line arguments.
-    ref_cfg : dict
-        Reference configuration (includes STAR genome index).
-    outdir : Path
-        Output directory for STAR results for this sample.
-
-    Returns
-    -------
-    StarSampleOutputs
+    Function: run_star
+    Purpose: Run STAR for a single sample
+    - Returns a StarSampleOutputs file containing the BAM path and unmapped FastQ files.
     """
+    
     utils.ensure_dir(outdir)
-
     genome_dir = _resolve_genome_index(args, ref_cfg)
 
     # Input reads
@@ -112,21 +94,14 @@ def run_star(sample: Sample, args: Any, ref_cfg: dict, outdir: Path) -> StarSamp
         unmapped_fastq2=unmapped2,
     )
 
-
 def run_star_batch(samples: List[Sample], args: Any, ref_cfg: dict) -> StarBatchOutputs:
     """
-    Run STAR alignment for all samples.
-
-    Parameters
-    ----------
-    samples : list of Sample
-    args : argparse.Namespace
-    ref_cfg : dict
-
-    Returns
-    -------
-    StarBatchOutputs
+    Function: run_star_batch
+    Purpose: Run STAR alignment for all samples.
+    - Loops over all samples, creates per-sample STAR output directories, 
+      calls run_star for each, and returns a batch object mapping sample IDs to their STAR outputs.
     """
+  
     # Use a 'star' subdir under the main outdir
     base_outdir = utils.subdir(Path(args.outdir), "star")
 
